@@ -140,6 +140,8 @@
             newimg.style.position = 'absolute';
             newimg.style.left = '0px';
             newimg.style.top = '0px';
+            newimg.setAttribute("crossorigin", "anonymous");
+
             document.getElementById('pdf-viewer').appendChild(newimg);
             //quitar img de imgSign
             myState = { ...myState, imgSign: myState.imgSign.filter(element => element !== myState.imgSign[0]) };
@@ -181,6 +183,7 @@
 
                     var viewport = page.getViewport({ scale: 1.8 });
                     var canvas = document.createElement('canvas');
+                    canvas.setAttribute("crossorigin", "anonymous");
                     canvas.height = viewport.height;
                     canvas.width = viewport.width;
 
@@ -252,7 +255,7 @@
         }
 
         // Cargar el archivo PDF y las páginas iniciales
-        pdfjsLib.getDocument('./pdfpaginas.pdf').promise.then(function (pdfDoc_) {
+        pdfjsLib.getDocument('https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf').promise.then(function (pdfDoc_) {
             pdfDoc = pdfDoc_;
             document.getElementById('page-count').textContent = pdfDoc.numPages;
 
