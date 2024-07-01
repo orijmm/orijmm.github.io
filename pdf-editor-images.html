@@ -24,37 +24,36 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/1.3.4/jspdf.min.js"></script>
 
     <div class="container-fluid">
-        <div class="row justify-content-center">
-            <div class="col-12">
-                <div>
-                    <button type="button" class="btn btn-info" id="prevPage">Previous Page</button>
-                    <span>Page <span id="page-num"></span> of <span id="page-count"></span></span>
-                    <button type="button" class="btn btn-info" id="nextPage">Page Next</button>
-                </div>
+    <div class="row justify-content-center">
+        <div class="col-12">
+            <div>
+                <button type="button" class="btn btn-info" id="prevPage">Previous Page</button>
+                <span>Page <span id="page-num"></span> of <span id="page-count"></span></span>
+                <button type="button" class="btn btn-info" id="nextPage">next Page</button>
             </div>
-            <div class="col-8">
-                <div id="pdf-viewer">
-                    <canvas id="pdfCanvas"></canvas>
-                </div>
+        </div>
+        <div class="col-8">
+            <div id="pdf-viewer">
+
+                <canvas id="pdfCanvas"></canvas>
             </div>
-            <div class="col-4">
-                <ul class="list-group list-group-numbered">
-                    <li class="list-group-item">
-                        <div>Click on imagen <small>(border green selected)</small></div>
-                        <div class="custom-file">
-                            <img src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Jangminho_signature.png"
-                                id="imageEle1" class="sign-img" onclick="selectImg(this)" alt="firma1" width="100px">
-                        </div>
-                    </li>
-                    <li class="list-group-item">
-                        <!-- Botón para agregar la imagen -->
-                        <button type="button" id="add-image" disabled class="btn btn-primary btn-lg">Add
-                            image</button>
-                    </li>
-                    <li class="list-group-item"><!-- Botón para descargar el PDF -->
-                        <button type="button" class="btn btn-primary btn-lg" id="download-pdf">Download PDF</button>
-                    </li>
-                </ul>
+        </div>
+        <div class="col-4">
+            <ul class="list-group">
+                <li class="list-group-item ">
+                    <div class="custom-file">
+                        <input type="file" id="image-file" accept="image/*" class="custom-file-input">
+                        <label class="custom-file-label" for="customFile">Choose file</label>
+                    </div>
+                </li>
+                <li class="list-group-item">
+                    <!-- Botón para agregar la imagen -->
+                    <button type="button" id="add-image" class="btn btn-primary btn-lg">Add image</button>
+                </li>
+                <li class="list-group-item"><!-- Botón para descargar el PDF -->
+                    <button type="button" class="btn btn-primary btn-lg" id="download-pdf">Download PDF</button>
+                </li>
+            </ul>
                 <div class="d-flex justify-content-center my-5">
                     <a href="https://github.com/orijmm/signaturepdf">
                         <img src="./github-mark.png" alt="githubmark" width="100px">
@@ -62,6 +61,8 @@
                 </div>
             </div>
         </div>
+
+
     </div>
     <script>
         // Variables globales
@@ -71,10 +72,21 @@
             pageNumPending = null,
             canvas = document.getElementById('pdfCanvas'),
             ctx = canvas.getContext('2d');
+        paperType = [{
+            'a4': [8.27, 11.69]
+        }, {
+            'letter': [8.5, 11]
+        }, {
+            'legal': [8.5, 14]
+        }]
 
         var myState = {
             imgSign: [],
-            imgAdded: []
+            imgAdded: [],
+            paperSizeXY: [],
+            paperSizeXYDecimals: [],
+            paperSize: '',
+            paperOrientation: 'p'
         }
 
         // Funciones de renderizado de página
@@ -83,13 +95,22 @@
 
             // Obtener la página
             pdfDoc.getPage(num).then(function (page) {
-                var viewport = page.getViewport({ scale: 1.8 });
+                var viewport = page.getViewport({
+                    scale: 1.8
+                });
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
                 canvas.style.width = '100%';
                 canvas.dataset.page = num;
 
-                let dimensions = page.getViewport(1).viewBox.map(n => n / 72 * 300);
+                //dimenciones
+                let dimensions = page.getViewport(1).viewBox.map(n => n / 72);
+
+                myState.paperSizeXY = [dimensions[2], dimensions[3]];
+
+                //dimenciones con decimales en caso que no tenga las medidas estandars de paperType
+                myState.paperSizeXYDecimals = [parseFloat(dimensions[2].toFixed(2)), parseFloat(dimensions[3].toFixed(2))];
+                myState.paperOrientation = dimensions[2] > dimensions[3] ? 'l' : 'p';
 
                 // Renderizar la página en el canvas
                 var renderContext = {
@@ -111,76 +132,93 @@
 
         }
 
-        //Evento en al seleccionar la imagen
-        function selectImg(img) {
-            const signImgs = document.querySelectorAll('.sign-img');
-            img.classList.toggle('border-green');//borde verde
-
-            // Crear un elemento de lienzo HTML (max 2 img)
-            if (myState.imgSign.length < 2 && img.classList.contains('border-green')) {
-                //agregar con operador spread al objeto myState
-                myState = { ...myState, imgSign: [...myState.imgSign, img.id] };
-            } else {
-                //quitar con operador spread del objeto myState
-                myState = { ...myState, imgSign: myState.imgSign.filter(element => element !== img.id) };
-            }
-
-            // Deshabilitar el botón si la matriz `imgSign` está vacía
-            document.getElementById('add-image').disabled = myState.imgSign.length === 0;
-        }
-
         // Agregar la imagen al canvas al hacer clic en el botón
         const addImageButton = document.getElementById('add-image');
-
         addImageButton.addEventListener('click', () => {
-            // Crear un contenedor para la imagen
-            const imagensign = document.getElementById(myState.imgSign[0]);
-            //clonar imagen
-            const newimg = imagensign.cloneNode(true);
-            newimg.setAttribute("id", imagensign.id + "_Drag");
-            newimg.removeAttribute("onclick");
-            newimg.classList.toggle('border-green');
-            imagensign.removeAttribute("onclick");//quitar onclick a la img original
+            //obtener imagen
+            const imageFile = document.getElementById('image-file').files[0];
+            const imageUrl = URL.createObjectURL(imageFile);
+            const image = new Image(100, 100);
+            image.setAttribute("id", "imageEle");
+            image.src = imageUrl;
+            image.onload = () => {
+                // Crear un contenedor para la imagen
+                const imageContainer = document.createElement('div');
+                imageContainer.setAttribute("id", "imageContainer");
+                imageContainer.appendChild(image);
+                imageContainer.style.position = 'absolute';
+                imageContainer.style.left = '0px';
+                imageContainer.style.top = '0px';
+                //agregar imagen al contenedor
+                document.getElementById('pdf-viewer').appendChild(imageContainer);
 
-            newimg.style.position = 'absolute';
-            newimg.style.left = '0px';
-            newimg.style.top = '0px';
-            newimg.setAttribute("crossorigin", "anonymous");
+                // Hacer que la imagen sea interactiva
+                interact(imageContainer)
+                    // Habilitar la funcionalidad de arrastrar y soltar
+                    .draggable({
+                        modifiers: [interact.modifiers.restrictRect({
+                            restriction: 'parent'
+                        })]
+                    })
+                    .resizable({
+                        preserveAspectRatio: false,
+                        edges: {
+                            left: true,
+                            right: true,
+                            bottom: true,
+                            top: true
+                        }
+                    })
+                    // Manejar el evento "dragmove"
+                    .on('dragmove', function (event) {
+                        // Actualizar la posición de la imagen según el movimiento del mouse
+                        const target = event.target;
+                        const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+                        const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+                        target.style.transform = `translate(${x}px, ${y}px)`;
+                        target.setAttribute('data-x', x);
+                        target.setAttribute('data-y', y);
 
-            document.getElementById('pdf-viewer').appendChild(newimg);
-            //quitar img de imgSign
-            myState = { ...myState, imgSign: myState.imgSign.filter(element => element !== myState.imgSign[0]) };
-            //agregar clon a imgAdded (imagenes agregadas)
-            myState = { ...myState, imgAdded: [...myState.imgAdded, newimg.id] };
+                        //pagina donde está siendo colocada
+                        var containercanvapage = document.querySelector('#pdf-viewer canvas');
+                        image.dataset.page = containercanvapage.dataset.page;
+                    })
+                    .on('resizemove', function (event) {
+                        var target = event.target,
+                            x = (parseFloat(target.getAttribute('data-x')) || 0),
+                            y = (parseFloat(target.getAttribute('data-y')) || 0);
 
-            interact(newimg)
-                // Habilitar la funcionalidad de arrastrar y soltar
-                .draggable({ modifiers: [interact.modifiers.restrictRect({ restriction: 'parent' })] })
+                        // update the element's style
+                        target.style.width = event.rect.width + 'px';
+                        target.style.height = event.rect.height + 'px';
 
-                // Manejar el evento "dragmove"
-                .on('dragmove', function (event) {
-                    // Actualizar la posición de la imagen según el movimiento del mouse
-                    const target = event.target;
-                    const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
-                    const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
-                    target.style.transform = `translate(${x}px, ${y}px)`;
-                    target.setAttribute('data-x', x);
-                    target.setAttribute('data-y', y);
+                        // translate when resizing from top or left edges
+                        x += event.deltaRect.left;
+                        y += event.deltaRect.top;
 
-                    //pagina donde está siendo colocada
-                    var containercanvapage = document.querySelector('#pdf-viewer canvas');
-                    newimg.dataset.page = containercanvapage.dataset.page;
-                });
+                        target.style.webkitTransform = target.style.transform =
+                            'translate(' + x + 'px,' + y + 'px)';
+
+                        target.setAttribute('data-x', x);
+                        target.setAttribute('data-y', y);
+                        target.textContent = event.rect.width + '×' + event.rect.height;
+                    });
+            };
         });
 
         // Agregar el evento click al botón de descarga
         const downloadButton = document.getElementById('download-pdf');
         downloadButton.addEventListener('click', downloadAllPages);
 
+
         function downloadAllPages() {
 
             var totalPages = pdfDoc.numPages;
             var doc = new jsPDF('p', 'pt', 'a4');
+            //selecciona firm
+            const imagepdf = document.querySelector('#imageEle');
+            // Obtener la posición de la imagen
+            const imagePosition = imagepdf.getBoundingClientRect();
 
             for (let i = 1; i <= totalPages; i++) {
 
@@ -188,7 +226,6 @@
 
                     var viewport = page.getViewport({ scale: 1.8 });
                     var canvas = document.createElement('canvas');
-                    canvas.setAttribute("crossorigin", "anonymous");
                     canvas.height = viewport.height;
                     canvas.width = viewport.width;
 
@@ -201,26 +238,10 @@
                         // Agregar la imagen del canvas al PDF
                         var imgData = canvas.toDataURL('image/jpeg');
                         doc.addImage(imgData, 'JPEG', 0, 0, doc.internal.pageSize.width, doc.internal.pageSize.height);
-                        myState.imgAdded.forEach(element => { //por cada imagen agregada
-                            //selecciona firm
-                            const imagepdf = document.getElementById(element);
-
-                            // Obtener la posición de la imagen
-                            const imagePosition = imagepdf.getBoundingClientRect();
-                            ////////
-                            // Obtener las coordenadas del centro del padre
-                            const padreRect = document.getElementById('pdf-viewer').getBoundingClientRect();
-                            // Calcular la distancia entre el borde izquierdo del padre y el borde izquierdo de la imagen
-                            const distanciaLeft = Math.abs(imagePosition.left - padreRect.left);
-                            const distanciaTop = Math.abs(imagePosition.top - padreRect.top);
-                            ///////
-
-                            if (imagepdf.dataset.page == i) {
-                                const scalaPDF = document.getElementById('pdf-viewer').clientWidth / doc.internal.pageSize.width;
-                                doc.addImage(imagepdf, 'PNG', distanciaLeft / scalaPDF, distanciaTop / scalaPDF, imagePosition.width / scalaPDF, imagePosition.height / scalaPDF);
-                            }
-                        });
-
+                        if (imagepdf.dataset.page == i) {
+                            const scalaPDF = document.getElementById('pdf-viewer').clientWidth / doc.internal.pageSize.width;
+                            doc.addImage(imagepdf, 'PNG', imagePosition.left / scalaPDF, imagePosition.top / scalaPDF, imagePosition.width / scalaPDF, imagePosition.height / scalaPDF);
+                        }
                         // Si es la última página, descargar el PDF
                         if (i === totalPages) {
                             //selecciona firm
@@ -231,6 +252,8 @@
                         }
                     });
                 });
+
+
             }
         }
 
